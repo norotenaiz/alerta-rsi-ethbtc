@@ -14,15 +14,17 @@ def send_telegram_message(text):
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    response = requests.post(url, json=payload)
-    print("Respuesta de Telegram:", response.status_code)
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        print("Respuesta de Telegram:", response.status_code)
+    except Exception as e:
+        print(f"Error al enviar mensaje a Telegram: {e}")
 
 def calculate_rsi(prices, period=14):
     delta = prices.diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
 
-    # Suavizado de Wilder (método estándar para el RSI)
     avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
     avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
 
@@ -31,11 +33,20 @@ def calculate_rsi(prices, period=14):
     return rsi
 
 def main():
-    # Obtener últimas 100 velas de 1 hora de la API pública de Binance
-    url = f"https://api.binance.com/api/v3/klines?symbol={SYMBOL}&interval={INTERVAL}&limit=100"
-    response = requests.get(url)
-    response.raise_for_status()
-    data = response.json()
+    # Usamos api.binance.vision para evitar bloqueos regionales de IP en GitHub Actions
+    url = f"https://api.binance.vision/api/v3/klines?symbol={SYMBOL}&interval={INTERVAL}&limit=100"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"Fallo en servidor principal. Probando alternativa: {e}")
+        fallback_url = f"https://api.binance.com/api/v3/klines?symbol={SYMBOL}&interval={INTERVAL}&limit=100"
+        response = requests.get(fallback_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
 
     df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume", "close_time", "qav", "num_trades", "taker_base", "taker_quote", "ignore"])
     df["close"] = df["close"].astype(float)
