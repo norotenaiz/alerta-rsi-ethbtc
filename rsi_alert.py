@@ -5,8 +5,6 @@ import pandas as pd
 # ---------------------------------------------------------
 # Configuración y Constantes
 # ---------------------------------------------------------
-SYMBOL_BINANCE = "ETHBTC"
-SYMBOL_KUCOIN = "ETH-BTC"
 PERIOD = 14
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 100
@@ -38,35 +36,8 @@ def send_telegram_message(message: str) -> bool:
         return False
 
 
-def fetch_klines_binance(symbol="ETHBTC", interval="1h", limit=100):
-    """Obtiene velas de 1 hora desde la API pública de Binance Spot."""
-    url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": limit
-    }
-
-    try:
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        raw_klines = resp.json()
-
-        # Estructura Binance: [Open Time, Open, High, Low, Close, Volume, ...]
-        df = pd.DataFrame(
-            raw_klines,
-            columns=["timestamp", "open", "high", "low", "close", "volume", 
-                     "close_time", "qav", "num_trades", "tbb", "tbq", "ignore"]
-        )
-        df["close"] = df["close"].astype(float)
-        return df
-    except Exception as e:
-        print(f"⚠️ Error al consultar Binance: {e}")
-    return None
-
-
 def fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour"):
-    """Respaldo: obtiene velas desde la API pública de KuCoin."""
+    """Fuente Primaria: obtiene velas desde la API pública de KuCoin."""
     url = "https://api.kucoin.com/api/v1/market/candles"
     params = {
         "symbol": symbol,
@@ -83,12 +54,40 @@ def fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour"):
                 data["data"],
                 columns=["time", "open", "close", "high", "low", "volume", "turnover"]
             )
-            # KuCoin entrega de reciente a antiguo, invertimos el orden
+            # KuCoin entrega las velas de reciente a antiguo; invertimos el orden
             df = df.iloc[::-1].reset_index(drop=True)
             df["close"] = df["close"].astype(float)
             return df
     except Exception as e:
         print(f"⚠️ Error al consultar KuCoin: {e}")
+    return None
+
+
+def fetch_klines_okx(symbol="ETH-BTC", bar="1H"):
+    """Fuente Secundaria: obtiene velas desde la API pública de OKX."""
+    url = "https://www.okx.com/api/v5/market/candles"
+    params = {
+        "instId": symbol,
+        "bar": bar,
+        "limit": "100"
+    }
+
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if data.get("code") == "0" and "data" in data:
+            # Estructura OKX: [ts, open, high, low, close, ...]
+            df = pd.DataFrame(
+                data["data"],
+                columns=["ts", "open", "high", "low", "close", "vol", "volCcy", "volCcyQuote", "confirm"]
+            )
+            df = df.iloc[::-1].reset_index(drop=True)
+            df["close"] = df["close"].astype(float)
+            return df
+    except Exception as e:
+        print(f"⚠️ Error al consultar OKX: {e}")
     return None
 
 
@@ -109,13 +108,13 @@ def calculate_rsi(df: pd.DataFrame, period=14) -> pd.DataFrame:
 def main():
     print("🔍 Obteniendo datos de mercado para ETH/BTC (Velas 1H)...")
 
-    # Intentar primero Binance
-    df = fetch_klines_binance(symbol=SYMBOL_BINANCE, interval="1h", limit=100)
+    # Intentar primero KuCoin
+    df = fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour")
 
-    # Si falla Binance, intentar KuCoin
+    # Si falla KuCoin, intentar OKX
     if df is None or df.empty:
-        print("🔄 Intentando proveedor secundario (KuCoin)...")
-        df = fetch_klines_kucoin(symbol=SYMBOL_KUCOIN, type_kline="1hour")
+        print("🔄 Intentando proveedor secundario (OKX)...")
+        df = fetch_klines_okx(symbol="ETH-BTC", bar="1H")
 
     if df is None or df.empty:
         print("❌ No se pudieron obtener velas de ningún Exchange.")
