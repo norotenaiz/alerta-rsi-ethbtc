@@ -7,7 +7,7 @@ import pandas as pd
 # ---------------------------------------------------------
 PERIOD = 14
 RSI_OVERBOUGHT = 70
-RSI_OVERSOLD = 30
+RSI_OVERSOLD = 100
 
 # .strip() elimina automáticamente cualquier espacio o salto de línea (\n) accidental
 TELEGRAM_TOKEN = (os.getenv("TELEGRAM_TOKEN") or "").strip()
