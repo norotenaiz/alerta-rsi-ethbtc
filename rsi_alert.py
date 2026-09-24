@@ -5,7 +5,8 @@ import pandas as pd
 # ---------------------------------------------------------
 # Configuración y Constantes
 # ---------------------------------------------------------
-SYMBOL = "ETHBTC"
+SYMBOL_BINANCE = "ETHBTC"
+SYMBOL_KUCOIN = "ETH-BTC"
 PERIOD = 14
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
@@ -37,11 +38,10 @@ def send_telegram_message(message: str) -> bool:
         return False
 
 
-def fetch_klines_bybit(symbol="ETHBTC", interval="60", limit=100):
-    """Obtiene velas de 1 hora (interval='60') desde la API de Bybit Spot."""
-    url = "https://api.bybit.com/v5/market/kline"
+def fetch_klines_binance(symbol="ETHBTC", interval="1h", limit=100):
+    """Obtiene velas de 1 hora desde la API pública de Binance Spot."""
+    url = "https://api.binance.com/api/v3/klines"
     params = {
-        "category": "spot",
         "symbol": symbol,
         "interval": interval,
         "limit": limit
@@ -50,26 +50,23 @@ def fetch_klines_bybit(symbol="ETHBTC", interval="60", limit=100):
     try:
         resp = requests.get(url, params=params, timeout=10)
         resp.raise_for_status()
-        data = resp.json()
+        raw_klines = resp.json()
 
-        if data.get("retCode") == 0 and "list" in data.get("result", {}):
-            raw_klines = data["result"]["list"]
-            # Bybit entrega las velas de la más reciente a la más antigua
-            df = pd.DataFrame(
-                raw_klines,
-                columns=["timestamp", "open", "high", "low", "close", "volume", "turnover"]
-            )
-            # Revertimos para mantener orden cronológico
-            df = df.iloc[::-1].reset_index(drop=True)
-            df["close"] = df["close"].astype(float)
-            return df
+        # Estructura Binance: [Open Time, Open, High, Low, Close, Volume, ...]
+        df = pd.DataFrame(
+            raw_klines,
+            columns=["timestamp", "open", "high", "low", "close", "volume", 
+                     "close_time", "qav", "num_trades", "tbb", "tbq", "ignore"]
+        )
+        df["close"] = df["close"].astype(float)
+        return df
     except Exception as e:
-        print(f"⚠️ Error al consultar Bybit: {e}")
+        print(f"⚠️ Error al consultar Binance: {e}")
     return None
 
 
 def fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour"):
-    """Respaldo secundario: obtiene velas desde la API de KuCoin."""
+    """Respaldo: obtiene velas desde la API pública de KuCoin."""
     url = "https://api.kucoin.com/api/v1/market/candles"
     params = {
         "symbol": symbol,
@@ -86,6 +83,7 @@ def fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour"):
                 data["data"],
                 columns=["time", "open", "close", "high", "low", "volume", "turnover"]
             )
+            # KuCoin entrega de reciente a antiguo, invertimos el orden
             df = df.iloc[::-1].reset_index(drop=True)
             df["close"] = df["close"].astype(float)
             return df
@@ -111,11 +109,13 @@ def calculate_rsi(df: pd.DataFrame, period=14) -> pd.DataFrame:
 def main():
     print("🔍 Obteniendo datos de mercado para ETH/BTC (Velas 1H)...")
 
-    df = fetch_klines_bybit(symbol=SYMBOL, interval="60", limit=100)
+    # Intentar primero Binance
+    df = fetch_klines_binance(symbol=SYMBOL_BINANCE, interval="1h", limit=100)
 
+    # Si falla Binance, intentar KuCoin
     if df is None or df.empty:
         print("🔄 Intentando proveedor secundario (KuCoin)...")
-        df = fetch_klines_kucoin(symbol="ETH-BTC", type_kline="1hour")
+        df = fetch_klines_kucoin(symbol=SYMBOL_KUCOIN, type_kline="1hour")
 
     if df is None or df.empty:
         print("❌ No se pudieron obtener velas de ningún Exchange.")
@@ -124,7 +124,7 @@ def main():
     # Calcular RSI
     df = calculate_rsi(df, period=PERIOD)
 
-    # Evaluar la vela más reciente en tiempo real
+    # Evaluar la vela más reciente
     current_candle = df.iloc[-1]
     current_rsi = round(float(current_candle["rsi"]), 2)
     current_price = float(current_candle["close"])
