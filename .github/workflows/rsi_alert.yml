@@ -1,8 +1,7 @@
-name: Alerta RSI ETH/BTC
+name: Alerta RSI ETH/BTC y XAU/XAG
 
 on:
   schedule:
-    # Se ejecuta cada 15 minutos en el entorno de GitHub Actions
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -22,10 +21,10 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install requests pandas
+          pip install requests pandas yfinance
 
       - name: Ejecutar verificación de RSI
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_1 }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python rsi_alert.py
+        run: python rsi_alert_bot.py
