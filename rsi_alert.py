@@ -187,17 +187,24 @@ def fetch_metals_ratio_closes(pair: dict, tf: dict) -> Optional[pd.DataFrame]:
             print(f"⚠️ Yahoo Finance no devolvió datos para {pair['name']} ({tf['label']}).")
             return None
 
-        merged = pd.merge(
-            xau[["Close"]], xag[["Close"]],
-            left_index=True, right_index=True,
-            suffixes=("_xau", "_xag"),
-        ).dropna()
+        # Según la versión de yfinance, las columnas pueden venir como MultiIndex
+        # (p.ej. ('Close', 'GC=F')) incluso pidiendo un solo ticker. Se normalizan
+        # a columnas simples antes de trabajar con ellas.
+        if isinstance(xau.columns, pd.MultiIndex):
+            xau.columns = xau.columns.get_level_values(0)
+        if isinstance(xag.columns, pd.MultiIndex):
+            xag.columns = xag.columns.get_level_values(0)
+
+        xau_close = xau["Close"].rename("close_xau")
+        xag_close = xag["Close"].rename("close_xag")
+
+        merged = pd.concat([xau_close, xag_close], axis=1).dropna()
 
         if merged.empty:
             print(f"⚠️ No se pudieron alinear las velas de XAU y XAG ({tf['label']}).")
             return None
 
-        merged["close"] = merged["Close_xau"] / merged["Close_xag"]
+        merged["close"] = merged["close_xau"] / merged["close_xag"]
         return merged[["close"]].reset_index(drop=True)
     except Exception as e:
         print(f"⚠️ Error al consultar Yahoo Finance ({pair['name']}, {tf['label']}): {e}")
