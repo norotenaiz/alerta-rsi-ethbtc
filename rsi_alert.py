@@ -65,8 +65,10 @@ PAIRS = [
     {
         "name": "XAU/XAG",
         "type": "metals",
-        "xau_ticker": "XAUUSD=X",
-        "xag_ticker": "XAGUSD=X",
+        # XAUUSD=X / XAGUSD=X no devuelven datos intradía fiables en Yahoo Finance.
+        # Se usan los futuros (Gold/Silver ratio), que sí tienen histórico intradía.
+        "xau_ticker": "GC=F",
+        "xag_ticker": "SI=F",
     },
 ]
 
