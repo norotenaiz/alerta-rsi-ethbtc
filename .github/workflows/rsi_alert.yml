@@ -23,8 +23,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pandas yfinance
 
-      - name: Ejecutar verificación de RSI
+          - name: Ejecutar verificación de RSI
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_1 }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python rsi_alert_bot.py
+        run: python rsi_alert.py
