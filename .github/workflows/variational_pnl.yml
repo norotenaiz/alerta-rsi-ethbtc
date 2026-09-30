@@ -1,0 +1,30 @@
+name: Variational XAU/XAG PNL
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-pnl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Comprobar PNL Variational
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_1 }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python variational_pnl.py
