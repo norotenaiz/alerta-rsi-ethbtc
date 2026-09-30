@@ -23,9 +23,11 @@ def load_state():
 
 
 def telegram(text):
+    token = os.environ["TELEGRAM_TOKEN"].strip()
+    chat_id = os.environ["CHAT_ID"].strip()
     r = requests.post(
-        f"https://api.telegram.org/bot{os.environ['TELEGRAM_TOKEN']}/sendMessage",
-        data={"chat_id": os.environ["CHAT_ID"], "text": text},
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data={"chat_id": chat_id, "text": text},
         timeout=20,
     )
     r.raise_for_status()
