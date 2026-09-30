@@ -3,7 +3,7 @@ from pathlib import Path
 import requests
 
 URL = "https://omni-client-api.prod.ap-northeast-1.variational.io/metadata/stats"
-TARGET = -100.0   # alerta al llegar a este PNL
+TARGET = 30.0   # alerta al llegar a este PNL
 REARM = 25.0    # se vuelve a armar cuando baja de aquí
 
 POSITIONS = {
